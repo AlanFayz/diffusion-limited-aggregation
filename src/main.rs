@@ -6,19 +6,19 @@ mod utils;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "out.ppm")]
+    #[arg(long, default_value = "out.ppm")]
     file_path: String,
 
-    #[arg(short, long, default_value_t = 1000)]
+    #[arg(long, default_value_t = 1000)]
     width: usize,
 
-    #[arg(short, long, default_value_t = 1000)]
+    #[arg(long, default_value_t = 1000)]
     height: usize,
 
     #[arg(long, default_value_t = 200*200)]
     particle_count: usize,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     progress_check: bool,
 
     #[arg(long, default_value_t = true)]

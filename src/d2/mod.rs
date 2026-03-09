@@ -1,7 +1,8 @@
 use rand::{RngExt, rngs::ThreadRng};
 use std::{
     fs::{File, exists},
-    io::Write, time::Instant
+    io::Write,
+    time::Instant,
 };
 
 use crate::utils::{lerp, pack_rgba, unpack_rgba};
@@ -19,11 +20,18 @@ fn random_position(rng: &mut ThreadRng, width: usize, height: usize) -> (usize, 
     )
 }
 
-fn count_neighbours(x: i64, y: i64, width: i64, height: i64, grid: &Vec<Cell>) -> u32 {
+fn count_neighbours_radius(
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+    radius: i64,
+    grid: &Vec<Cell>,
+) -> u32 {
     let mut cnt = 0;
 
-    for dy in -1..2 {
-        for dx in -1..2 {
+    for dy in -radius..radius + 1 {
+        for dx in -radius..radius + 1 {
             if dx == 0 && dy == 0 {
                 continue;
             }
@@ -37,6 +45,10 @@ fn count_neighbours(x: i64, y: i64, width: i64, height: i64, grid: &Vec<Cell>) -
     return cnt;
 }
 
+fn count_neighbours(x: i64, y: i64, width: i64, height: i64, grid: &Vec<Cell>) -> u32 {
+    count_neighbours_radius(x, y, width, height, 1, grid)
+}
+
 fn shade(
     x: usize,
     y: usize,
@@ -45,10 +57,12 @@ fn shade(
     particle_count: usize,
     grid: &Vec<Cell>,
 ) -> u32 {
+    const NEIGHBOURS_RADIUS: u32 = 5;
     const BG_COLOR: u32 = 0x0;
     const START_COLOR: u32 = 0xFF0000FF;
     const END_COLOR: u32 = 0x0000FFFF;
-    const MAX_NEIGHBOURS: f32 = 8.0;
+    const MAX_NEIGHBOURS: f32 =
+        ((NEIGHBOURS_RADIUS * 2 + 1) * (NEIGHBOURS_RADIUS * 2 + 1)) as f32 - 1.0;
 
     let cell = &grid[x + y * width];
 
@@ -65,8 +79,15 @@ fn shade(
     let g = lerp(s_g, e_g, t);
     let b = lerp(s_b, e_b, t);
 
-    let cnt = count_neighbours(x as i64, y as i64, width as i64, height as i64, grid);
-    let intensity = 1.0 - (cnt as f32 / MAX_NEIGHBOURS).powf(1.5).clamp(0.0, 1.0);
+    let cnt = count_neighbours_radius(
+        x as i64,
+        y as i64,
+        width as i64,
+        height as i64,
+        NEIGHBOURS_RADIUS as i64,
+        grid,
+    );
+    let intensity = 1.0 - (cnt as f32 / MAX_NEIGHBOURS);
 
     return pack_rgba(r * intensity, g * intensity, b * intensity);
 }
@@ -83,13 +104,20 @@ pub fn run_simulation(
         return None;
     }
 
+    let check_scale = 64;
+    let check_width = width.div_ceil(check_scale);
+    let check_height = height.div_ceil(check_scale);
+
     let mut rng = rand::rng();
     let mut grid: Vec<Cell> = vec![Default::default(); width * height];
+    let mut check_grid: Vec<bool> = vec![false; check_width * check_height];
 
     let seed = random_position(&mut rng, width, height);
 
     grid[seed.0 + seed.1 * width].occupied = true;
     grid[seed.0 + seed.1 * width].iter_count = Some(0);
+
+    check_grid[(seed.0 / check_scale) + (seed.1 / check_scale) * check_width] = true;
 
     let start = Instant::now();
 
@@ -108,7 +136,31 @@ pub fn run_simulation(
                 break;
             }
 
-            let nxt = [(0, -1), (0, 1), (-1, 0), (1, 0)];
+            let step_size = 'sz: {
+                let (cx, cy) = (x / check_scale, y / check_scale);
+                for dy in -1..2 {
+                    for dx in -1..2 {
+                        let (nx, ny) = (cx as i64 + dx, cy as i64 + dy);
+                        let (cx, cy) = (
+                            nx.rem_euclid(check_width as i64) as usize,
+                            ny.rem_euclid(check_height as i64) as usize,
+                        );
+
+                        if check_grid[cx + cy * check_width] == true {
+                            break 'sz 1;
+                        }
+                    }
+                }
+
+                check_scale as i64
+            };
+
+            let nxt = [
+                (0, -1 * step_size),
+                (0, 1 * step_size),
+                (-1 * step_size, 0),
+                (1 * step_size, 0),
+            ];
             let (dx, dy) = nxt[rng.random::<i64>() as usize % nxt.len()];
             let (nx, ny) = (x as i64 + dx, y as i64 + dy);
             (x, y) = (
@@ -119,6 +171,8 @@ pub fn run_simulation(
 
         grid[x + y * width].occupied = true;
         grid[x + y * width].iter_count = Some(i + 1);
+
+        check_grid[(x / check_scale) + (y / check_scale) * check_width] = true;
     }
 
     let delta = Instant::now() - start;

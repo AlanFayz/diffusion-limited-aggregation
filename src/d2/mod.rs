@@ -1,7 +1,7 @@
 use rand::{RngExt, rngs::ThreadRng};
 use std::{
     fs::{File, exists},
-    io::Write,
+    io::Write, time::Instant
 };
 
 use crate::utils::{lerp, pack_rgba, unpack_rgba};
@@ -76,26 +76,32 @@ pub fn run_simulation(
     width: usize,
     height: usize,
     particle_count: usize,
+    progress_check: bool,
+    profile: bool,
 ) -> Option<()> {
     if !exists(out_path).ok()? {
         return None;
     }
 
     let mut rng = rand::rng();
+    let mut grid: Vec<Cell> = vec![Default::default(); width * height];
 
     let seed = random_position(&mut rng, width, height);
-
-    let mut grid: Vec<Cell> = vec![Default::default(); width * height];
 
     grid[seed.0 + seed.1 * width].occupied = true;
     grid[seed.0 + seed.1 * width].iter_count = Some(0);
 
+    let start = Instant::now();
+
     for i in 0..particle_count {
         let (mut x, mut y) = random_position(&mut rng, width, height);
-        println!(
-            "Progress: {}%",
-            (i as f32) * 100.0 / (particle_count as f32)
-        );
+
+        if progress_check {
+            println!(
+                "Progress: {}%",
+                (i as f32) * 100.0 / (particle_count as f32)
+            );
+        }
 
         loop {
             if count_neighbours(x as i64, y as i64, width as i64, height as i64, &grid) > 0 {
@@ -113,6 +119,11 @@ pub fn run_simulation(
 
         grid[x + y * width].occupied = true;
         grid[x + y * width].iter_count = Some(i + 1);
+    }
+
+    let delta = Instant::now() - start;
+    if profile {
+        println!("Simulation took {}s", delta.as_secs_f64());
     }
 
     let mut file = File::create(out_path).unwrap();

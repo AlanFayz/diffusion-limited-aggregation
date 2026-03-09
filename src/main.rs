@@ -9,14 +9,20 @@ struct Args {
     #[arg(short, long, default_value = "out.ppm")]
     file_path: String,
 
-    #[arg(short, long, default_value_t = 200)]
+    #[arg(short, long, default_value_t = 1000)]
     width: usize,
 
-    #[arg(short, long, default_value_t = 200)]
+    #[arg(short, long, default_value_t = 1000)]
     height: usize,
 
-    #[arg(short, long, default_value_t = 50*100)]
+    #[arg(long, default_value_t = 200*200)]
     particle_count: usize,
+
+    #[arg(long, default_value_t = false)]
+    progress_check: bool,
+
+    #[arg(long, default_value_t = true)]
+    profile: bool,
 }
 
 fn main() {
@@ -27,6 +33,8 @@ fn main() {
         args.width,
         args.height,
         args.particle_count,
+        args.progress_check,
+        args.profile
     )
     .unwrap();
 

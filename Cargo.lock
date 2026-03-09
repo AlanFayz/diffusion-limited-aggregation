@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "DLA"
-version = "0.1.0"
-dependencies = [
- "clap",
- "rand 0.10.0",
- "rng",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -143,6 +134,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "dla"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "rand 0.10.0",
+ "rng",
 ]
 
 [[package]]

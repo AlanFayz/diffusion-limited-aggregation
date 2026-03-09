@@ -5,27 +5,27 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Release executable 'DLA'",
+            "name": "Release executable 'dla'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
                 "args": [
                     "run",
                     "--release",
-                    "--bin=DLA"
+                    "--bin=dla"
                 ]
             },
             "args": []
         },
         
         {
-            "name": "Debug executable 'DLA'",
+            "name": "Debug executable 'dla'",
             "type": "lldb",
             "request": "launch",
             "cargo": {
                 "args": [
                     "run",
-                    "--bin=DLA"
+                    "--bin=dla"
                 ]
             },
             "args": []

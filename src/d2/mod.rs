@@ -56,22 +56,22 @@ fn shade(
     height: usize,
     particle_count: usize,
     grid: &Vec<Cell>,
+    bg_color: u32,
+    start_color: u32,
+    end_color: u32,
 ) -> u32 {
     const NEIGHBOURS_RADIUS: u32 = 5;
-    const BG_COLOR: u32 = 0x0;
-    const START_COLOR: u32 = 0xFF0000FF;
-    const END_COLOR: u32 = 0x0000FFFF;
     const MAX_NEIGHBOURS: f32 =
         ((NEIGHBOURS_RADIUS * 2 + 1) * (NEIGHBOURS_RADIUS * 2 + 1)) as f32 - 1.0;
 
     let cell = &grid[x + y * width];
 
     if !cell.occupied {
-        return BG_COLOR;
+        return bg_color;
     }
 
-    let (s_r, s_g, s_b) = unpack_rgba(START_COLOR);
-    let (e_r, e_g, e_b) = unpack_rgba(END_COLOR);
+    let (s_r, s_g, s_b) = unpack_rgba(start_color);
+    let (e_r, e_g, e_b) = unpack_rgba(end_color);
 
     let t = cell.iter_count.unwrap_or(0) as f32 / particle_count as f32;
 
@@ -99,12 +99,11 @@ pub fn run_simulation(
     particle_count: usize,
     progress_check: bool,
     profile: bool,
+    check_scale: usize,
+    bg_color: u32,
+    start_color: u32,
+    end_color: u32,
 ) -> Option<()> {
-    if !exists(out_path).ok()? {
-        return None;
-    }
-
-    let check_scale = 64;
     let check_width = width.div_ceil(check_scale);
     let check_height = height.div_ceil(check_scale);
 
@@ -186,8 +185,21 @@ pub fn run_simulation(
 
     for y in 0..height {
         for x in 0..width {
-            file.write(&shade(x, y, width, height, particle_count, &grid).to_be_bytes()[0..3])
-                .ok()?;
+            file.write(
+                &shade(
+                    x,
+                    y,
+                    width,
+                    height,
+                    particle_count,
+                    &grid,
+                    bg_color,
+                    start_color,
+                    end_color,
+                )
+                .to_be_bytes()[0..3],
+            )
+            .ok()?;
         }
     }
 

@@ -1,6 +1,12 @@
 use rand::{RngExt, rngs::ThreadRng};
 use std::{fs::File, io::Write};
 
+#[derive(Default, Clone, Copy)]
+struct Cell {
+    occupied: bool,
+    iter_count: Option<usize>,
+}
+
 fn random_position(rng: &mut ThreadRng, width: usize, height: usize) -> (usize, usize) {
     (
         rng.random::<u32>() as usize % width,
@@ -8,56 +14,95 @@ fn random_position(rng: &mut ThreadRng, width: usize, height: usize) -> (usize, 
     )
 }
 
-fn check_bounds(
-    x: i64,
-    y: i64,
-    width: i64,
-    height: i64,
-    particle_color: u32,
-    grid: &Vec<u32>,
-) -> bool {
+fn count_neighbours(x: i64, y: i64, width: i64, height: i64, grid: &Vec<Cell>) -> u32 {
+    let mut cnt = 0;
+
     for dy in -1..2 {
-        if y + dy < 0 || y + dy >= height {
-            continue;
-        }
         for dx in -1..2 {
-            if x + dx < 0 || x + dx >= width {
+            if dx == 0 && dy == 0 {
                 continue;
             }
-            let idx = (x + dx) + (y + dy) * width;
-            if grid[idx as usize] == particle_color {
-                return true;
+            let idx = (x + dx).rem_euclid(width) + (y + dy).rem_euclid(height) * width;
+            if grid[idx as usize].occupied {
+                cnt += 1;
             }
         }
     }
 
-    return false;
+    return cnt;
+}
+
+fn unpack_rgba(c: u32) -> (f32, f32, f32) {
+    let r = ((c >> 24) & 0xFF) as f32 / 255.0;
+    let g = ((c >> 16) & 0xFF) as f32 / 255.0;
+    let b = ((c >> 8) & 0xFF) as f32 / 255.0;
+    return (r, g, b);
+}
+
+fn pack_rgba(r: f32, g: f32, b: f32) -> u32 {
+    let r = (r.clamp(0.0, 1.0) * 255.0) as u32;
+    let g = (g.clamp(0.0, 1.0) * 255.0) as u32;
+    let b = (b.clamp(0.0, 1.0) * 255.0) as u32;
+    let a = 0xFF;
+
+    return (r << 24) | (g << 16) | (b << 8) | a;
+}
+
+fn lerp(s: f32, e: f32, t: f32) -> f32 {
+    s + (e - s) * t
+}
+
+fn shade(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    particle_count: usize,
+    grid: &Vec<Cell>,
+) -> u32 {
+    const BG_COLOR: u32 = 0x0;
+    const START_COLOR: u32 = 0xFF0000FF;
+    const END_COLOR: u32 = 0x0000FFFF;
+    const MAX_NEIGHBOURS: f32 = 8.0;
+
+    let cell = &grid[x + y * width];
+
+    if !cell.occupied {
+        return BG_COLOR;
+    }
+
+    let (s_r, s_g, s_b) = unpack_rgba(START_COLOR);
+    let (e_r, e_g, e_b) = unpack_rgba(END_COLOR);
+
+    let t = cell.iter_count.unwrap_or(0) as f32 / particle_count as f32;
+
+    let r = lerp(s_r, e_r, t);
+    let g = lerp(s_g, e_g, t);
+    let b = lerp(s_b, e_b, t);
+
+    let cnt = count_neighbours(x as i64, y as i64, width as i64, height as i64, grid);
+    let intensity = 1.0 - (cnt as f32 / MAX_NEIGHBOURS).powf(1.5).clamp(0.0, 1.0);
+
+    return pack_rgba(r * intensity, g * intensity, b * intensity);
 }
 
 fn main() {
     let mut rng = rand::rng();
 
-    let (width, height) = (400usize, 400usize);
+    let (width, height) = (500usize, 500usize);
     let particle_count = 100 * 100;
     let seed = random_position(&mut rng, width, height);
 
-    let bg_color: u32 = 0xFFFFFFFF;
-    let particle_color: u32 = 0xFF00FFFF;
+    let mut grid: Vec<Cell> = vec![Default::default(); width * height];
 
-    let mut grid: Vec<u32> = vec![bg_color; width * height];
-    grid[seed.0 + seed.1 * width] = particle_color;
+    grid[seed.0 + seed.1 * width].occupied = true;
+    grid[seed.0 + seed.1 * width].iter_count = Some(0);
 
-    for _ in 0..particle_count {
+    for i in 0..particle_count {
         let (mut x, mut y) = random_position(&mut rng, width, height);
+        println!("Progress: {}%", (i as f32) * 100.0 / (particle_count as f32));
         loop {
-            if check_bounds(
-                x as i64,
-                y as i64,
-                width as i64,
-                height as i64,
-                particle_color,
-                &grid,
-            ) {
+            if count_neighbours(x as i64, y as i64, width as i64, height as i64, &grid) > 0 {
                 break;
             }
 
@@ -70,7 +115,8 @@ fn main() {
             );
         }
 
-        grid[x + y * width] = particle_color;
+        grid[x + y * width].occupied = true;
+        grid[x + y * width].iter_count = Some(i + 1);
     }
 
     let mut file = File::create("out.ppm").unwrap();
@@ -79,8 +125,8 @@ fn main() {
 
     for y in 0..height {
         for x in 0..width {
-            let index = x + y * width;
-            file.write(&grid[index].to_be_bytes()[0..3]).unwrap();
+            file.write(&shade(x, y, width, height, particle_count, &grid).to_be_bytes()[0..3])
+                .unwrap();
         }
     }
 }
